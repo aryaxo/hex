@@ -108,7 +108,13 @@ fn loopback<T: SizedSample + Send + 'static>(
                     .collect();
                 let _ = sender.try_send(mono);
             },
-            move |error| {
+            move |error: cpal::Error| {
+                // cpal reports a WASAPI data discontinuity as Xrun and still
+                // delivers the packet; loopback flags one right after Start,
+                // so reopening on it would never capture anything.
+                if error.kind() == cpal::ErrorKind::Xrun {
+                    return;
+                }
                 let _ = errors.try_send(error.to_string());
             },
             None,
